@@ -1,0 +1,10 @@
+{
+  "id": "muse_wait",
+  "name": "muse_wait",
+  "description": "description",
+  "disabled": false,
+  "provider": "python",
+  "scope": "",
+  "script": "muse_wait_sample.py",
+  "envvars": {}
+}
