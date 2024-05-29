@@ -4,6 +4,7 @@ from ele_lib import muse_wait
 # デバイス定義 ------------------------------------------------------------------------------------------
 # MUSE
 muse = context.devices.get("idevice")
+serial = muse.serial
 relay = muse.relay
 io = muse.io
 
@@ -21,6 +22,9 @@ wt = muse_wait.Wait()
 
 
 # 関数定義 --------------------------------------------------------------------------------------------
+def serial_control(dev,data):
+    dev.send(data)
+
 def rel_control(devch,state):
     devch.state = state
 
@@ -30,21 +34,26 @@ def level_control(devlev,value):
 def io_state():
     return io[0].digitalInput.value
 
+def send_data():
+    wt.wait(20,serial_control,[serial[0],"Hello,world!"],"Wait Name Send 1")
+    wt.wait(40,lambda:serial[0].send("hoge fuga piyo"),name="Wait Name Send 2")
+    wt.wait(60,serial_control,[serial[0],"0123456789"],"Wait Name Send 3")
+
 def show_wait_list():
     # *********************************************************************
     # 動作がわかりやすくなるように残り時間やWAITの名前を可視化しています。
     # 実運用時は必要ありませんです。
     # *********************************************************************
     list_len = len(wt.wait_list)
-    for i in range(10):
+    for i in range(12):
         if i < list_len:
-            tp.port[1].send_command("^TXT-%s,0,%s"%(i+1,wt.wait_list[i]["type"]))
-            tp.port[1].send_command("^TXT-%s,0,%s"%(i+11,"{:.3f}".format(wt.wait_list[i]["time"])))
-            tp.port[1].send_command("^TXT-%s,0,%s"%(i+21,wt.wait_list[i]["name"]))
+            tp.port[1].send_command("^TXT-%s,0,%s"%(i+11,wt.wait_list[i]["type"]))
+            tp.port[1].send_command("^TXT-%s,0,%s"%(i+31,"{:.3f}".format(wt.wait_list[i]["time"])))
+            tp.port[1].send_command("^TXT-%s,0,%s"%(i+51,wt.wait_list[i]["name"]))
         else:
-            tp.port[1].send_command("^TXT-%s,0,"%(i+1))
             tp.port[1].send_command("^TXT-%s,0,"%(i+11))
-            tp.port[1].send_command("^TXT-%s,0,"%(i+21))
+            tp.port[1].send_command("^TXT-%s,0,"%(i+31))
+            tp.port[1].send_command("^TXT-%s,0,"%(i+51))
 
 def refresh_tp():
     show_wait_list() # WAITのリストを表示 (運用時には不要)
@@ -59,6 +68,13 @@ def refresh_tp():
 def timeline_event(e):
     refresh_tp()
 tl.expired.listen(timeline_event)
+
+# SERIAL
+def data_event(e):
+    data_text = e.arguments["data"].decode("UTF-8")
+
+    tp.port[1].send_command("^TXT-1,0,%s"%data_text)
+serial[0].receive.listen(data_event)
 
 # BUTTON
 def button_event(e):
@@ -124,11 +140,23 @@ def button_event(e):
         elif ch == 8:
             wt.cancel_all_wait_until()
             rel_control(relay[0],False)
-for ch in range(1,9):
+        
+        elif ch == 9:
+            wt.wait(50,send_data)
+        
+        elif ch == 10:
+            wt.cancel_wait("Wait Name Send 1")
+            wt.cancel_wait("Wait Name Send 2")
+            wt.cancel_wait("Wait Name Send 3")
+            tp.port[1].send_command("^TXT-1,0,")
+for ch in range(1,11):
     tp.port[1].button[ch].watch(button_event)
 
 # MUSE ONLINE EVENT
 def muse_online(e):
+    serial[0].setCommParams("9600",8,1,"NONE","232")
+    serial[0].setFlowControl("NONE")
+
     rel_control(relay[0],False)
     rel_control(relay[1],False)
     rel_control(relay[2],False)
